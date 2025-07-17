@@ -1,0 +1,66 @@
+---
+title: "twins_group"
+author: "jiaqi"
+date: "2025-03-04"
+output: html_document
+---
+
+```{r}
+df <- read.csv('D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/within_1_div.csv')
+df1 <- read.csv('D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/saliva_div.csv')
+
+```
+
+```{r}
+head(df)
+head(df1)
+```
+```{r}
+# 假设数据框的名称是df
+
+# 将iid列转换为字符型，以便处理
+df$iid <- as.character(df$iid)
+
+# 提取iid列中的最后一位数
+df$iid_last_digit <- substr(df$iid, nchar(df$iid), nchar(df$iid))
+
+# 提取iid列的除最后一位的部分
+df$iid_prefix <- substr(df$iid, 1, nchar(df$iid) - 1)
+# 根据iid_prefix列分组，生成group列
+df$group <- as.integer(factor(df$iid_prefix))
+
+head(df$iid_prefix)
+
+```
+
+```{r}
+# 将iid列转换为字符型，以便处理
+df1$iid <- as.character(df1$iid)
+
+# 提取iid列中的最后一位数
+df1$iid_last_digit <- substr(df1$iid, nchar(df1$iid), nchar(df1$iid))
+
+# 提取iid列的除最后一位的部分
+df1$iid_prefix <- substr(df1$iid, 1, nchar(df1$iid) - 1)
+# 根据iid_prefix列分组，生成group列
+df1$group <- as.integer(factor(df1$iid_prefix))
+
+head(df1$iid_prefix)
+```
+
+```{r}
+df[, (ncol(df)-4):ncol(df)]
+```
+
+```{r}
+df1[, (ncol(df1)-4):ncol(df1)]
+```
+
+```{r}
+write.csv(df,'D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/twins_group.csv',row.names = FALSE)
+```
+
+```{r}
+write.csv(df1,'D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/twins_group1.csv',row.names = FALSE)
+```
+

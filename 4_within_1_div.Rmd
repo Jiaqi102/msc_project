@@ -1,0 +1,63 @@
+---
+title: "within_1_diversity"
+author: "jiaqi"
+date: "2025-02-24"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+```
+
+```{r}
+df <- read.csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/merged_micro_urine.csv", stringsAsFactors = FALSE)
+df1 <- read.csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/merged_micro_saliva.csv", stringsAsFactors = FALSE)
+div <- read.table("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/merged_alpha_diversity_GS.tsv",sep="\t", header = TRUE) 
+```
+
+```{r}
+nrow(df)
+nrow(df1)
+dim(df)
+dim(df1)
+```
+```{r}
+# 筛选 delta_age == 0 的行
+filtered_data <- subset(df, delta_age == 0)
+```
+
+```{r}
+nrow(filtered_data)
+ncol(filtered_data)
+```
+
+```{r}
+colnames(div)[colnames(div) == "Prefix"] <- "prefix"
+```
+
+```{r}
+# 进行合并（基于 Prefix 列）
+merged_df <- merge(filtered_data, div, by="prefix", all.x=TRUE)
+merged_df1 <- merge(df1, div, by="prefix", all.x=TRUE)
+
+```
+
+```{r}
+nrow(merged_df)
+nrow(merged_df1)
+```
+```{r}
+# 查看前几行数据
+head(merged_df)
+head(merged_df1)
+```
+
+```{r}
+# 如果需要保存合并后的数据
+write.csv(merged_df, "D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/within_1_div.csv", row.names=FALSE)
+```
+
+```{r}
+write.csv(merged_df1, "D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/saliva_div.csv", row.names=FALSE)
+```
+

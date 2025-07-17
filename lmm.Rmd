@@ -1,0 +1,271 @@
+---
+title: "lmm"
+output: html_document
+date: "2025-03-17"
+---
+
+```{r}
+install.packages("lmerTest")
+```
+
+```{r}
+library(tidyverse)
+library(lmerTest)
+library(ggplot2)
+```
+
+```{r}
+data <- read.csv("C:/Users/k24019712/Downloads/twins_group.csv",stringsAsFactors = FALSE)
+library(lmerTest)
+library(tidyverse)
+```
+
+```{r}
+data_clean <- data %>% drop_na(age, sex.x, bmi)
+```
+
+```{r}
+data_selected <- data_clean %>%
+  select(age, sex.x, bmi, diversity_shannon, group, starts_with("M"))
+```
+
+```{r}
+head(data_selected)
+```
+```{r}
+data_selected <- data_selected %>%
+  select(-c(missing_date, Mreads_raw, Mreads_QC, Mreads_lost_pc))
+```
+
+```{r}
+write.csv(data_selected, "C:/Users/k24019712/Downloads/shannon_metabolites.csv", row.names = FALSE)
+```
+
+```{r}
+data_selected <- read.csv("D:/shannon_metabolites.csv")
+data_selected1 <- read.csv("D:/shannon_metabolites1.csv")
+```
+
+```{r}
+# z-score transformation for shannon
+Z_Score_Shannon <- scale(data_selected$diversity_shannon)
+final_data <- cbind(data_selected, Z_Score_Shannon)
+head(final_data)
+nrow(final_data)
+# z-score transformation for shannon
+Z_Score_Shannon1 <- scale(data_selected1$diversity_shannon)
+final_data1 <- cbind(data_selected1, Z_Score_Shannon1)
+head(final_data1)
+nrow(final_data1)
+```
+
+```{r}
+
+```
+
+```{r}
+# Run univariate linear regression for each metabolite
+# metabolites <- grep("^M", names(final_data), value = TRUE)
+# head(metabolites)
+metabolites <- c("M38637", "M35434", "M64041", "M61869", "M48679", "M47135", 
+                "M62787", "M64281", "M64418", "M62313", "M61878", "M48454", 
+                "M43400", "M27513", "M43530")
+head(metabolites)
+
+metabolites1 <- c( "M42561", "M43378", "M47089", "M52987", "M40410",
+  "M22202", "M61843", "M20694", "M18335", "M52689",
+  "M44681", "M48857", "M607", "M43446", "M44883",
+  "M35126", "M37097", "M1504", "M62105", "M41220",
+  "M62950", "M1515", "M601", "M42420")
+head(metabolites1)
+```
+
+
+```{r}
+df <- tibble()
+for (mtb in metabolites){
+  model <- lm(as.formula(paste("diversity_shannon ~", mtb)), data = final_data)
+  lmreg <- summary(model)
+  coef <- lmreg$coefficients[2, ]
+  beta <- coef["Estimate"]
+  std_error = coef["Std. Error"]
+  pval <- coef["Pr(>|t|)"]
+  df <- rbind(df, tibble(metabolite = mtb, beta_coef = beta,se = std_error, P_value = pval))
+}
+
+
+df_zscore <- tibble()
+for (mtb in metabolites){
+  model <- lm(as.formula(paste("Z_Score_Shannon ~", mtb)), data = final_data)
+  lmreg <- summary(model)
+  coef <- lmreg$coefficients[2, ]
+  beta <- coef["Estimate"]
+  std_error = coef["Std. Error"]
+  pval <- coef["Pr(>|t|)"]
+  df_zscore <- rbind(df_zscore, tibble(metabolite = mtb, beta_coef = beta,se = std_error, P_value = pval))
+}
+
+```
+
+```{r}
+head(df)
+head(df_zscore)
+```
+```{r}
+# Run linear mixed model with adjustments for shannon index
+
+df_lmm <- tibble()
+for (mtb in metabolites){
+  model <- lmer(as.formula(paste("diversity_shannon ~", mtb, "+ age + bmi + sex.x + (1 | group)")), data = final_data)
+  lmreg <- summary(model)
+  coef <- lmreg$coefficients[2, ]
+  beta <- coef["Estimate"]
+  std_error = coef["Std. Error"]
+  pval <- coef["Pr(>|t|)"]
+  df_lmm <- rbind(df_lmm, tibble(metabolite = mtb, beta_coef = beta, se = std_error, P_value = pval))
+}
+
+# Run linear mixed model with adjustments for z-score shannon index
+
+df_lmm_zscore <- tibble()
+for (mtb in metabolites){
+  model <- lmer(as.formula(paste("Z_Score_Shannon ~", mtb, "+ age + bmi + sex.x + (1 | group)")), data = final_data)
+  lmreg <- summary(model)
+  coef <- lmreg$coefficients[2, ]
+  beta <- coef["Estimate"]
+  std_error = coef["Std. Error"]
+  pval <- coef["Pr(>|t|)"]
+  df_lmm_zscore <- rbind(df_lmm_zscore, tibble(metabolite = mtb, beta_coef = beta,se = std_error, P_value = pval))
+}
+#saliva
+df_lmm_zscore1 <- tibble()
+for (mtb1 in metabolites1){
+  model <- lmer(as.formula(paste("Z_Score_Shannon1 ~", mtb1, "+ age + bmi + sex.x + (1 | group)")), data = final_data1)
+  lmreg <- summary(model)
+  coef <- lmreg$coefficients[2, ]
+  beta <- coef["Estimate"]
+  std_error = coef["Std. Error"]
+  pval <- coef["Pr(>|t|)"]
+  df_lmm_zscore1 <- rbind(df_lmm_zscore1, tibble(metabolite = mtb1, beta_coef = beta,se = std_error, P_value = pval))
+}
+```
+
+```{r}
+head(df_lmm)
+df_lmm_zscore$FDR <- p.adjust(df_lmm_zscore$P_value, method = "fdr")
+print(df_lmm_zscore)
+df_lmm_zscore1$FDR <- p.adjust(df_lmm_zscore1$P_value, method = "fdr")
+print(df_lmm_zscore1)
+
+```
+
+```{r}
+annotation <- read.csv("D:/msc_projecct/QC_urine/QC_urine/KGCO-0504-20DSMLTA+ Urine Data Tables_Chemical Annotation.csv", stringsAsFactors = FALSE)
+annotation1 <- read.csv("D:/msc_projecct/QC_saliva/QC_saliva/KGCO-0504-20DSMLTA+ Saliva Data Tables_Chemical Annotation.csv", stringsAsFactors = FALSE)
+
+```
+
+
+```{r}
+annotation$COMP_ID <- paste0("M", annotation$COMP_ID)
+annotation1$COMP_ID <- paste0("M", annotation1$COMP_ID)
+```
+
+```{r}
+annotation$metabolite <- sub("^M", "", annotation$metabolite)
+annotation1$metabolite <- sub("^M", "", annotation1$metabolite)
+```
+
+```{r}
+colnames(annotation)[colnames(annotation) == "COMP_ID"] <- "metabolite"
+annotation_selected <- annotation[, c("metabolite","CHEMICAL_NAME")]
+
+colnames(annotation1)[colnames(annotation1) == "COMP_ID"] <- "metabolite"
+annotation_selected1 <- annotation1[, c("metabolite","CHEMICAL_NAME")]
+
+```
+
+```{r}
+head(annotation_selected)
+head(annotation_selected1)
+```
+```{r}
+#merged_zscore <- merge(df_zscore,annotation_selected,by="metabolite", all.x=TRUE)
+merged_lmm_zscore <- merge(df_lmm_zscore,annotation_selected,by="metabolite", all.x=TRUE)
+#head(merged_zscore)
+head(merged_lmm_zscore)
+top_lmm <- merged_lmm_zscore %>% arrange(FDR)
+print(top_lmm)
+
+merged_lmm_zscore1 <- merge(df_lmm_zscore1,annotation_selected1,by="metabolite", all.x=TRUE)
+#head(merged_zscore)
+head(merged_lmm_zscore1)
+top_lmm1 <- merged_lmm_zscore1 %>% arrange(FDR)
+print(top_lmm1)
+
+```
+
+```{r}
+#森林图
+top_lmm <- top_lmm %>%
+  mutate(
+    lower = beta_coef - 1.96 * se,
+    upper = beta_coef + 1.96 * se
+  )
+top_lmm <- top_lmm %>%
+  arrange(beta_coef) %>%
+  mutate(CHEMICAL_NAME = factor(CHEMICAL_NAME, levels = CHEMICAL_NAME))
+
+top_lmm <- top_lmm %>%
+  mutate(sig = ifelse(P_value < 0.05, "p < 0.05", "n.s."))
+
+ggplot(top_lmm, aes(x = beta_coef, y = CHEMICAL_NAME, color = sig)) +
+  geom_point(size = 3) +
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray40") +
+  scale_color_manual(values = c("p < 0.05" = "firebrick", "n.s." = "gray40")) +
+  theme_minimal(base_size = 13) +
+  labs(
+    x = "Beta Coefficient (Effect Size)",
+    y = NULL,
+    color = "Significance",
+    title = "Forest Plot",
+    subtitle = "Shannon Diversity (z-score) Adjusted"
+  )
+```
+
+```{r}
+#森林图
+top_lmm1 <- top_lmm1 %>%
+  mutate(
+    lower = beta_coef - 1.96 * se,
+    upper = beta_coef + 1.96 * se
+  )
+top_lmm1 <- top_lmm1 %>%
+  arrange(beta_coef) %>%
+  mutate(CHEMICAL_NAME = factor(CHEMICAL_NAME, levels = CHEMICAL_NAME))
+
+top_lmm1 <- top_lmm1 %>%
+  mutate(sig = ifelse(P_value < 0.05, "p < 0.05", "n.s."))
+
+ggplot(top_lmm1, aes(x = beta_coef, y = CHEMICAL_NAME, color = sig)) +
+  geom_point(size = 3) +
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray40") +
+  scale_color_manual(values = c("p < 0.05" = "firebrick", "n.s." = "gray40")) +
+  theme_minimal(base_size = 13) +
+  labs(
+    x = "Beta Coefficient (Effect Size)",
+    y = NULL,
+    color = "Significance",
+    title = "Forest Plot of Top 15",
+    subtitle = "Shannon Diversity (z-score) Adjusted"
+  )
+```
+
+```{r}
+# 保存修改后的数据
+write.csv(merged_zscore, "C:/Users/k24019712/Downloads/shannon_urine_zscore.csv", row.names = FALSE)
+write.csv(merged_lmm_zscore, "C:/Users/k24019712/Downloads/shannon_urine_lmm_zscore.csv", row.names = FALSE)
+```
+

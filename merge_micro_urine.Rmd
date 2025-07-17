@@ -1,0 +1,52 @@
+---
+title: "merged_microbime"
+author: "jiaqi"
+date: "2025-02-19"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+```
+
+```{r}
+micro_data <- read.csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/filtered_recent_5_years.csv", stringsAsFactors = FALSE)
+
+urine_data <- read.csv("D:/msc_projecct/QC_urine/QC_urine/recent_5_years.csv", stringsAsFactors = FALSE)
+
+
+```
+
+```{r}
+head(micro_data)
+head(urine_data)
+ncol(micro_data)
+ncol(urine_data)
+```
+
+```{r}
+any(duplicated(micro_data$iid))
+any(duplicated(urine_data$iid))
+```
+
+```{r}
+merged_data <- merge(micro_data, urine_data,
+by = "iid",
+all.x = TRUE)
+```
+
+```{r}
+head(merged_data)
+nrow(merged_data)
+```
+```{r}
+merged_data <- merged_data[!is.na(merged_data$M1527), ]
+nrow(merged_data)
+```
+
+
+```{r}
+# 如果需要保存合并后的数据到新文件
+write.csv(merged_data, "D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/merged_data_by_iid.csv", row.names = FALSE)
+```
+

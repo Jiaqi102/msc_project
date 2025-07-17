@@ -1,0 +1,143 @@
+---
+title: "merge_delta_age"
+author: "jiaqi"
+date: "2025-02-20"
+output: html_document
+---
+```{r}
+library(dplyr)
+```
+
+```{r}
+micro_data <- read.csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/20_filtered_microbial_abundance.csv", stringsAsFactors = FALSE)
+
+urine_data <- read.csv("D:/msc_projecct/QC_urine/QC_urine/filtered_named_metabolites.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+head(micro_data)
+head(urine_data)
+nrow(micro_data)
+nrow(urine_data)
+```
+```{r}
+#按照iid降序
+micro_data <- micro_data %>%
+  arrange(desc(iid))
+micro_data
+
+urine_data <- urine_data %>%
+  arrange(desc(iid))
+urine_data
+```
+```{r}
+#全连接
+merged_df <- full_join(micro_data, urine_data, by = "iid")
+
+```
+```{r}
+merged_df <- merged_df %>%
+  filter(!is.na(age)& !is.na(age_baseline))
+print(merged_df)
+```
+
+
+```{r}
+merged_df <- merged_df %>% 
+  relocate(age_baseline, .after = age)
+
+```
+
+```{r}
+merged_df <- merged_df %>%
+  mutate(delta_age = abs(age - age_baseline))
+merged_df <- merged_df %>% 
+  relocate(delta_age, .after = age_baseline)
+
+```
+
+```{r}
+merged_df <- merged_df %>%
+  group_by(iid) %>%
+  filter(delta_age == min(delta_age)) %>%
+  ungroup()
+
+print(merged_df)
+```
+```{r}
+library(lubridate)
+merged_df$dov <- dmy(merged_df$dov)
+merged_df$date_of_visit <- ymd(merged_df$date_of_visit)
+```
+
+
+```{r}
+df <- merged_df %>%
+  mutate(date_diff = as.numeric(abs(dov - date_of_visit)))
+df <- df %>% 
+  relocate(date_of_visit, .after = dov)
+df <- df %>% 
+  relocate(date_diff, .after = date_of_visit)
+head(df)
+nrow(df)
+
+```
+```{r}
+df <- df %>%
+  group_by(iid) %>%
+  filter(date_diff == min(date_diff)) %>%
+  ungroup()
+#print(df)
+```
+
+```{r}
+df_duplicates <- df[df$iid %in% df$iid[duplicated(df$iid)], ]
+#print(df_duplicates)
+
+```
+
+```{r}
+df <- df %>%
+  group_by(iid) %>%
+  filter(dov == min(dov)) %>%
+  ungroup()
+print(df)
+```
+```{r}
+anyDuplicated(df$iid)
+```
+```{r}
+df_filtered <- df %>%
+  filter(delta_age <= 5)
+
+print(df_filtered)
+```
+```{r}
+freq_table <- table(df_filtered$delta_age)
+print(freq_table)
+
+```
+```{r}
+library(ggplot2)
+
+# 计算频率百分比
+df_percent <- df_filtered %>%
+  count(delta_age) %>%
+  mutate(percent = n / sum(n) * 100)
+
+# 绘制柱状图
+ggplot(df_percent, aes(x = factor(delta_age), y = percent)) +
+  geom_bar(stat = "identity", fill = "blue", color = "black") +
+  geom_text(aes(label = paste0(round(percent, 1), "%")), vjust = -0.5) +  # 添加百分比标签
+  labs(title = "Frequency Distribution of delta_age",
+       x = "delta_age",
+       y = "Percentage (%)") +
+  theme_minimal()
+
+```
+
+
+```{r}
+write.csv(df_filtered, file = "D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/merged_micro_urine.csv", row.names = FALSE)
+```
+

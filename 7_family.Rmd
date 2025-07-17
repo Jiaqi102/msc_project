@@ -1,0 +1,76 @@
+---
+title: "family"
+author: "jiaqi"
+date: "2025-06-03"
+output: html_document
+---
+```{r}
+# 加载必要的库
+library(dplyr)
+library(readr)
+library(tidyverse)
+```
+
+```{r}
+# 读取数据
+abundance_data <- read_csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/merged_metaphlan_bugs_abundance_table_20211201_version_4_cm.csv")
+
+taxa_annotation <- read_csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/taxa_annotation_cm.csv")
+```
+
+```{r}
+# 筛选 species 分类（含 "f__"）
+family_taxa <- taxa_annotation %>%
+  filter(grepl("f__", clade_name) & !grepl("g__", clade_name) & !grepl("s__", clade_name) & !grepl("t__", clade_name))
+
+head(family_taxa)
+View(family_taxa)
+```
+```{r}
+# 提取所有列名
+all_columns <- colnames(twins)
+
+head(twins)
+```
+```{r}
+# 找到所有需要保留的列：
+# 1. metadata 列（不在 taxa_annotation 里的列）
+# 2. species 对应的 taxa 列
+metadata_columns <- setdiff(all_columns, taxa_annotation$taxa)  # 非菌群列
+family_columns <- family_taxa$taxa  # 仅包含 species 级别的菌群列
+
+head(metadata_columns)
+head(family_columns)
+length(metadata_columns)
+length(family_columns)
+```
+```{r}
+abundance_data <- column_to_rownames(abundance_data, "prefix")
+```
+
+```{r}
+twins <- read.csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/twins_group.csv")
+```
+
+```{r}
+# 筛选数据
+family_data <- abundance_data %>%
+  dplyr::select(all_of(family_columns))
+metadata <- twins %>%
+  dplyr::select(all_of(metadata_columns))
+head(family_data)
+head(metadata)
+View(family_data)
+```
+```{r}
+family_data <- rownames_to_column(family_data, "prefix")
+```
+```{r}
+filtered_data <- dplyr::left_join(metadata, family_data, by = "prefix")
+nrow(filtered_data)
+```
+```{r}
+# 保存筛选后的数据
+write_csv(filtered_data, "D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/twins_group_family.csv")
+```
+

@@ -1,0 +1,40 @@
+---
+title: "20%filter"
+author: "jiaqi"
+date: "2025-02-13"
+output: html_document
+---
+
+```{r}
+df <- read.csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/filtered_abundance_species_only.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+# 选取以 "taxa" 开头的微生物丰度列
+taxa_columns <- grep("^taxa", colnames(df), value = TRUE)
+# 计算每列中丰度值为 0 的比例
+zero_percentage <- colMeans(df[, taxa_columns] == 0)
+# 筛选丰度值为 0 占比不超过 20% (0.2) 的列
+selected_taxa_columns <- taxa_columns[zero_percentage <= 0.2]
+# 提取筛选后的数据
+filtered_df <- df[, selected_taxa_columns]
+
+# 查看筛选后的数据
+head(filtered_df)
+```
+
+```{r}
+# 选取非菌群列（不以 "taxa" 开头的列）
+non_taxa_columns <- setdiff(colnames(df), taxa_columns)
+
+# 合并非菌群列和筛选后的菌群列
+merged_df <- df[, c(non_taxa_columns, selected_taxa_columns)]
+
+# 查看合并后的数据
+head(merged_df)
+```
+
+```{r}
+write.csv(merged_df, "D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/merged_filtered_microbial_abundance.csv", row.names = FALSE)
+```
+

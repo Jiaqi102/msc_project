@@ -1,0 +1,444 @@
+---
+title: "entrotype"
+author: "jiaqi"
+date: "2025-05-01"
+output: html_document
+---
+```{r}
+install.packages("clusterSim")
+install.packages("ggthemes")
+```
+
+```{r}
+pkg <- c("tidyverse", "clusterSim", "ggpubr", "ade4", "ggthemes")
+for(i in pkg){
+  library(i, quietly = TRUE, verbose = FALSE, warn.conflicts = FALSE, character.only = TRUE)
+}
+```
+
+
+```{r}
+twins_cohort <- read.csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/twins_group.csv")
+taxaname <- read.csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/taxa_annotation_cm.csv")
+twins_cohort <- column_to_rownames(twins_cohort, "prefix")
+```
+
+```{r}
+taxasp <- taxaname[grep("s__", taxaname$clade_name), ]
+nrow(taxasp)
+strains <- taxasp %>%
+  filter(grepl("t__", clade_name)) %>%
+  pull(taxa)
+head(strains)
+ncol(twins_cohort)
+```
+```{r}
+taxafa <- taxaname[grep("f__", taxaname$clade_name), ]
+nrow(taxafa)
+genus <- taxasp %>%
+  filter(grepl("g__", clade_name)) %>%
+  pull(taxa)
+head(genus)
+ncol(twins_cohort)
+twins_cohort <- twins_cohort[, !(names(twins_cohort) %in% genus)]
+ncol(twins_cohort)
+head(twins_cohort)
+```
+
+
+```{r}
+twins_cohort <- twins_cohort[, !(names(twins_cohort) %in% strains)]
+ncol(twins_cohort)
+head(twins_cohort)
+```
+
+
+```{r}
+taxasp <- taxasp %>% separate(clade_name, 
+                              c("Kingdom",
+                                "Phylum",
+                                "Class",
+                                "Order",
+                                "Family",
+                                "Genus",
+                                "Species"
+                              ), 
+                              sep="\\|", 
+                              remove=F)
+
+taxasp_remove <- taxasp[grep("t__", taxasp$clade_name), ]
+taxasp <- subset(taxasp, !(taxa %in% taxasp_remove$taxa))
+#write.csv(taxasp, "D:/msc_projecct/taxasp.csv")
+```
+```{r}
+taxafa <- taxafa %>% separate(clade_name, 
+                              c("Kingdom",
+                                "Phylum",
+                                "Class",
+                                "Order",
+                                "Family",
+                                "Genus",
+                                "Species"
+                              ), 
+                              sep="\\|", 
+                              remove=F)
+
+taxafa_remove <- taxafa[grep("g__", taxafa$clade_name), ]
+taxafa <- subset(taxafa, !(taxa %in% taxafa_remove$taxa))
+head(taxafa)
+any(duplicated(taxafa$Family))
+```
+
+
+
+```{r}
+head(taxasp)
+head(twins_cohort)
+```
+```{r}
+sptable <- twins_cohort[, grepl("^taxa", names(twins_cohort))]
+sptable <- sptable %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("taxa")
+head(sptable)
+nrow(sptable)
+```
+
+```{r}
+fatable <- twins_cohort[, grepl("^taxa", names(twins_cohort))]
+fatable <- fatable %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("taxa")
+head(fatable)
+nrow(fatable)
+```
+
+```{r}
+dist.JSD <- function(inMatrix, pseudocount=0.000001, ...) {
+  KLD <- function(x,y) sum(x *log(x/y))
+  JSD<- function(x,y) sqrt(0.5 * KLD(x, (x+y)/2) + 0.5 * KLD(y, (x+y)/2))
+  matrixColSize <- length(colnames(inMatrix))
+  matrixRowSize <- length(rownames(inMatrix))
+  colnames <- colnames(inMatrix)
+  resultsMatrix <- matrix(0, matrixColSize, matrixColSize)
+  
+  inMatrix = apply(inMatrix,1:2,function(x) ifelse (x==0,pseudocount,x))
+  
+  for(i in 1:matrixColSize) {
+    for(j in 1:matrixColSize) { 
+      resultsMatrix[i,j]=JSD(as.vector(inMatrix[,i]),
+                             as.vector(inMatrix[,j]))
+    }
+  }
+  colnames -> colnames(resultsMatrix) -> rownames(resultsMatrix)
+  as.dist(resultsMatrix)->resultsMatrix
+  attr(resultsMatrix, "method") <- "dist"
+  return(resultsMatrix) 
+}
+
+pam.clustering=function(x,k) { # x is a distance matrix and k the number of clusters
+  require(cluster)
+  cluster = as.vector(pam(as.dist(x), k, diss=TRUE)$clustering)
+  return(cluster)
+}
+
+noise.removal <- function(dataframe, percent=0.01, top=NULL){
+  dataframe->Matrix
+  bigones <- rowSums(Matrix)*100/(sum(rowSums(Matrix))) > percent 
+  Matrix_1 <- Matrix[bigones,]
+  print(percent)
+  return(Matrix_1)
+}
+```
+
+```{r}
+head(sptable)
+```
+
+```{r}
+taxagenera <- taxasp[,c("taxa","Genus")]
+genustable <- left_join(sptable, taxagenera, by = "taxa")
+genustable <- genustable[, !names(genustable) %in% "taxa"]
+all(sptable$taxa %in% taxagenera$taxa)
+head(taxagenera)
+head(genustable)
+length(unique(genustable$Genus))
+```
+```{r}
+#添加family名称到species taxa count中
+taxafamily <- taxasp[,c("taxa","Family")]
+familytable <- left_join(sptable, taxafamily, by = "taxa")
+familytable <- familytable[, !names(familytable) %in% "taxa"]
+head(taxafamily)
+head(familytable)
+anyDuplicated(familytable$Family)
+```
+
+```{r}
+#添加family名称到family taxa count中
+taxafamily <- taxafa[,c("taxa","Family")]
+familytable <- left_join(fatable, taxafamily, by = "taxa")
+familytable <- familytable[, !names(familytable) %in% "taxa"]
+head(taxafamily)
+head(familytable)
+
+```
+
+
+```{r}
+# sum the species table to genus table
+genusagg <- aggregate(genustable[,-length(genustable)], list(Genus = genustable[,"Genus"]), sum)
+
+genusagg <- column_to_rownames(genusagg, "Genus")
+
+genus_filter <- noise.removal(genusagg, percent=0.001)
+
+#genus_filter
+
+JSDdist = dist.JSD(genus_filter)
+
+nclusters=NULL
+for (k in 1:20) { 
+  if (k==1) {
+    nclusters[k]=NA 
+  } else {
+    data.cluster_temp=pam.clustering(JSDdist, k)
+    nclusters[k]=index.G1(t(genus_filter), 
+                          data.cluster_temp,  
+                          d = JSDdist,
+                          centrotypes = "medoids")
+  }
+}
+############## determine the number of clusters based on CH index ##############
+
+dfcluster <- data.frame(CHindex=nclusters)
+dfcluster$k_cluster <- seq(1:20)
+plot_ch <- ggbarplot(dfcluster, x = "k_cluster", y = "CHindex",
+                fill = "gray",           # change fill color by mpg_level
+                color = "white",         # Set bar border colors to white
+                )+
+  theme_bw()+
+  scale_x_continuous(breaks=seq(1,20,1))
+# when k_cluster = 4, the CHindex is highest
+
+ggsave(file = "D:/msc_projecct/cluster_number_all.png", plot_ch, width = 5, height = 4, type = "cairo", dpi = 300)
+```
+
+```{r}
+# sum the species table to family table
+famagg <- aggregate(familytable[,-length(familytable)], list(Family = familytable[,"Family"]), sum)
+
+famagg <- column_to_rownames(famagg, "Family")
+
+family_filter <- noise.removal(famagg, percent=0.01)
+
+JSDdist = dist.JSD(family_filter)
+
+nclusters=NULL
+for (k in 1:20) { 
+  if (k==1) {
+    nclusters[k]=NA 
+  } else {
+    data.cluster_temp=pam.clustering(JSDdist, k)
+    nclusters[k]=index.G1(t(family_filter), 
+                          data.cluster_temp,  
+                          d = JSDdist,
+                          centrotypes = "medoids")
+  }
+}
+############## determine the number of clusters based on CH index ##############
+
+dfcluster <- data.frame(CHindex=nclusters)
+dfcluster$k_cluster <- seq(1:20)
+plot_ch <- ggbarplot(dfcluster, x = "k_cluster", y = "CHindex",
+                fill = "gray",           # change fill color by mpg_level
+                color = "white",         # Set bar border colors to white
+                )+
+  theme_bw()+
+  scale_x_continuous(breaks=seq(1,20,1))
+# when k_cluster = 4, the CHindex is highest
+
+ggsave(file = "D:/msc_projecct/cluster_famnumber2_all.png", plot_ch, width = 5, height = 4, type = "cairo", dpi = 300)
+```
+
+```{r}
+k=2
+set.seed(0)
+sub.cluster=pam.clustering(JSDdist, k)
+obs.pca=dudi.pca(data.frame(t(genus_filter)), scannf=F, nf=10)
+obs.bet=bca(obs.pca, fac=as.factor(sub.cluster), scannf=F, nf=k-1) 
+subobsdf <- obs.bet$ls
+subobsdf$cluster <- sub.cluster
+```
+
+
+```{r}
+# twins_cohort <- rownames_to_column(twins_cohort, "prefix")
+
+all_ent <- rownames_to_column(subobsdf, "prefix") %>% dplyr::left_join(twins_cohort)
+
+```
+
+```{r}
+# the cluster 1-4 is the label of enterotypes
+
+# write_csv(all_ent, "D:/msc_projecct/all_cluster_taxa_table.csv")
+ View(subobsdf)
+ View(all_ent)
+selected_data <- all_ent %>%
+  dplyr::select(cluster, age, sex.x, bmi,group, diversity_shannon, core_taxa)
+cleaned_data <- selected_data %>%
+  drop_na(age, sex.x, bmi)
+write_csv(cleaned_data, "D:/shannon_taxa2.csv")
+```
+
+```{r}
+######################### check dominant genus of enterotypes ##################
+
+dominant <- function(type, metadf, asvtable){
+  cluster1 <- subset(metadf, cluster == type)
+  tablec1 <- asvtable[, cluster1$prefix]
+  speciessum <- apply(tablec1, 1, sum)
+  speciessumdf <- as.data.frame(speciessum) %>% rownames_to_column("taxa")
+  top10 <- arrange(speciessumdf, desc(speciessum))
+  # spname <- inner_join(top10,taxmat1[,c("taxon","Genus","Species")])
+  return(top10[1,"taxa"])
+}
+```
+
+```{r}
+#dominant family for enterotype 1
+dominant(1, all_ent, family_filter)
+
+#dominant family for enterotype 2
+dominant(2, all_ent, family_filter)
+
+```
+
+```{r}
+# 查看每个样本中非零的 family 数量
+colSums(family_filter > 0)
+
+# 检查两个样本间共享 family 数量
+shared_families <- function(x, y) {
+  sum((x > 0) & (y > 0))
+}
+
+# 例如检查前两个样本
+shared_families(family_filter[,1], family_filter[,2])
+
+```
+
+```{r}
+#dominant species for enterotype 1
+dominant(1, all_ent, genus_filter)
+
+#dominant species for enterotype 2
+dominant(2, all_ent, genus_filter)
+
+# dominant(3, all_ent, genus_filter)
+# 
+# dominant(4, all_ent, genus_filter)
+
+
+
+```
+
+
+```{r}
+############################# figure for enterotype ############################
+
+############################# figure for enterotype ############################
+
+all_ent <- mutate(all_ent, core_taxa=case_when(
+  cluster==1 ~ "Bifidobacterium",
+  cluster==2 ~ "Faecalibacterium"
+  # cluster==3 ~ "Blautia",
+  # cluster==4 ~ "Escherichia"
+))
+
+all_ent$core_taxa <- factor(all_ent$core_taxa, levels=c("Bifidobacterium", "Blautia", "Alistipes", "Escherichia"))
+all_ent$cluster <- factor(all_ent$cluster, levels=c("4","3","2","1"))
+
+
+entfig <- ggplot(data = all_ent, aes(x=CS1, y=CS2))+
+  geom_point(aes(shape=core_taxa,color=core_taxa))+
+  stat_ellipse(geom = "polygon", alpha = 0.2, aes(fill = core_taxa), level = 0.95) +
+  scale_color_manual(values = c("#7AA6DCFF","#CD534CFF","#EFC000FF","gray"))+
+  scale_fill_manual(values = c("#7AA6DCFF","#CD534CFF","#EFC000FF", "gray"))+
+  xlab("PCoA1(JSD)")+
+  ylab("PcoA2(JSD)")+
+  theme_classic()
+
+ggsave("D:/msc_projecct/Enterotype_all_indiv_PcoA3.png", entfig, width = 8, height = 6, type = "cairo", dpi = 300)
+```
+
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+pca_coords <- obs.pca$li
+pca_coords$cluster <- as.factor(sub.cluster)
+pca_coords$cluster <- factor(pca_coords$cluster,
+                             levels = c(1, 2, 3, 4),
+                             #labels = c("Bifidobacterium", "Faecalibacterium")
+                             )
+eigval <- obs.pca$eig
+percent1 <- round(100 * eigval[1] / sum(eigval), 1)
+percent2 <- round(100 * eigval[2] / sum(eigval), 1)
+# 确保前两列叫 Axis1 和 Axis2
+colnames(pca_coords)[1:2] <- c("Axis1", "Axis2")
+
+# 计算聚类中心
+centroids <- pca_coords %>%
+  group_by(cluster) %>%
+  summarize(
+    Axis1 = mean(Axis1),
+    Axis2 = mean(Axis2),
+    .groups = "drop"
+  )
+
+# 合并中心点坐标
+pca_coords_with_centroid <- pca_coords %>%
+  left_join(centroids, by = "cluster", suffix = c("", ".centroid"))
+
+# 绘图
+ggplot(pca_coords_with_centroid, aes(x = Axis1, y = Axis2, color = cluster)) +
+  # 点
+  geom_point(size = 1.5) +
+  
+  # 每个点到其中心点的虚线
+  geom_segment(aes(xend = Axis1.centroid, yend = Axis2.centroid),
+               linetype = "dashed", size = 0.3, alpha = 0.5) +
+
+  # 中心点：同样颜色、黑色边框十字
+  geom_point(data = centroids, aes(x = Axis1, y = Axis2, color = cluster),
+             inherit.aes = FALSE, shape = 4, size = 3, stroke = 1) +
+
+  # 椭圆表示每个聚类的范围，颜色和聚类一致
+  stat_ellipse(aes(fill = cluster), type = "norm", geom = "polygon",
+               alpha = 0.1, color = NA, show.legend = FALSE) +
+  stat_ellipse(type = "norm", size = 0.5, linetype = "dashed") +
+
+  # 标签和主题
+  labs(
+    title = "PCA of Microbiome Genus Abundance",
+    x = paste0("PC1 (", percent1, "% variance)"),
+    y = paste0("PC2 (", percent2, "% variance)"),
+    color = "Genus"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+summary(obs.pca)
+```
+
+```{r}
+genus_filter
+genusagg
+```
+

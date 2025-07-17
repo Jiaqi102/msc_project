@@ -1,0 +1,51 @@
+---
+title: "pre_prediction"
+author: "jiaqi"
+date: "2025-06-30"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+df <- read.csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/twins_group1.csv", row.names = FALSE)
+```
+
+
+```{r}
+grep("M", names(df), value = TRUE)
+```
+
+
+```{r}
+# 1. 找出以 "M" 开头的列
+metabolite_cols <- names(df)[startsWith(names(df), "M")]
+
+# 2. 指定需要排除的非代谢物列
+exclude_cols <- c("Mreads_raw", "Mreads_QC", "Mreads_lost_pc", "PARENT_SAMPLE_NAME")
+
+# 3. 去除这些非代谢物列
+metabolite_cols <- setdiff(metabolite_cols, exclude_cols)
+
+# 4. 合并保留的列
+keep_cols <- c("age", "sex.x", "bmi", "diversity_shannon", "group", metabolite_cols)
+
+# 5. 创建子集
+df_subset <- df[, keep_cols]
+```
+
+```{r}
+df_filtered <- df_subset[!is.na(df_subset$age) & !is.na(df_subset$sex.x) & !is.na(df_subset$bmi), ]
+nrow(df_subset)
+nrow(df_filtered)
+rownames(df_filtered) <- NULL
+```
+
+```{r}
+print(df_filtered)
+```
+
+
+```{r}
+write.csv(df_filtered, "D:/shannon_metabolites1.csv", row.names = FALSE)
+```
+

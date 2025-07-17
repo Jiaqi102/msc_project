@@ -1,0 +1,155 @@
+---
+title: "new_merge_saliva"
+author: "jiaqi"
+date: "2025-06-27"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+```
+
+```{r}
+micro_data <- read.csv("D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/20_filtered_microbial_abundance.csv", stringsAsFactors = FALSE)
+
+saliva_data <- read.csv("D:/msc_projecct/QC_saliva/QC_saliva/filtered_named_metabolites.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+head(micro_data)
+head(saliva_data)
+nrow(micro_data)
+nrow(saliva_data)
+```
+```{r}
+#按照iid降序
+micro_data <- micro_data %>%
+  arrange(desc(iid))
+head(micro_data)
+
+saliva_data <- saliva_data %>%
+  arrange(desc(iid))
+head(urine_data)
+```
+```{r}
+#全连接
+merged_df <- full_join(micro_data, saliva_data, by = "iid")
+```
+```{r}
+#去除na
+merged_df <- merged_df %>%
+  filter(!is.na(age)& !is.na(age_baseline))
+```
+
+```{r}
+#调整位置
+merged_df <- merged_df %>% 
+  relocate(age_baseline, .after = age)
+#计算间隔
+merged_df <- merged_df %>%
+  mutate(delta_age = abs(age - age_baseline))
+merged_df <- merged_df %>% 
+  relocate(delta_age, .after = age_baseline)
+nrow(merged_df)
+```
+```{r}
+# 方法1：先筛 fasted
+df_fasted1 <- merged_df %>%
+  filter(FASTING_STATUS == "Fasted") %>%
+  group_by(iid) %>%
+  filter(delta_age == min(delta_age)) %>%
+  ungroup()
+
+
+# 方法2：先选 delta_age，再筛 fasted
+df_fasted2 <- merged_df %>%
+  group_by(iid) %>%
+  filter(delta_age == min(delta_age)) %>%
+  ungroup() %>%
+  filter(FASTING_STATUS == "Fasted")
+nrow(df_fasted1); nrow(df_fasted2)
+```
+
+
+```{r}
+# 1. 过滤空腹样本
+df_fasted <- merged_df %>%
+  filter(FASTING_STATUS == "Fasted")
+nrow(df_fasted)
+```
+
+```{r}
+#同一组micro对应多次saliva测量，只留下最近的一次
+df <- df_fasted %>%
+  group_by(iid) %>%
+  filter(delta_age == min(delta_age)) %>%
+  ungroup()
+nrow(df)
+```
+
+```{r}
+#用日期算(更精确)
+library(lubridate)
+df$dov <- dmy(df$dov)
+df$date_of_visit <- ymd(df$date_of_visit)
+```
+
+
+```{r}
+#添加日期差
+df <- df %>%
+  mutate(date_diff = as.numeric(abs(dov - date_of_visit)))
+df <- df %>% 
+  relocate(date_of_visit, .after = dov)
+df <- df %>% 
+  relocate(date_diff, .after = date_of_visit)
+head(df)
+nrow(df)
+
+```
+
+```{r}
+#再次去重复
+df <- df %>%
+  group_by(iid) %>%
+  filter(date_diff == min(date_diff)) %>%
+  ungroup()
+nrow(df)
+```
+```{r}
+df_duplicates <- df[df$iid %in% df$iid[duplicated(df$iid)], ]
+nrow(df_duplicates)
+```
+```{r}
+df_filtered <- df %>%
+  filter(delta_age <= 5)
+
+print(df_filtered)
+```
+
+```{r}
+freq_table <- table(df_filtered$delta_age)
+print(freq_table)
+```
+
+```{r}
+library(ggplot2)
+
+# 计算频率百分比
+df_percent <- df_filtered %>%
+  count(delta_age) %>%
+  mutate(percent = n / sum(n) * 100)
+
+# 绘制柱状图
+ggplot(df_percent, aes(x = factor(delta_age), y = percent)) +
+  geom_bar(stat = "identity", fill = "blue", color = "black") +
+  geom_text(aes(label = paste0(round(percent, 1), "%")), vjust = -0.5) +  # 添加百分比标签
+  labs(title = "Frequency Distribution of delta_age",
+       x = "delta_age",
+       y = "Percentage (%)") +
+  theme_minimal()
+```
+```{r}
+write.csv(df_filtered, file = "D:/msc_projecct/OneDrive_2025-02-13/Genome Scan_Alessia 2023/merged_micro_saliva.csv", row.names = FALSE)
+```
+

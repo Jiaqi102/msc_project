@@ -1,0 +1,75 @@
+---
+title: "named_chem"
+author: "jiaqi"
+date: "2025-02-13"
+output: html_document
+---
+```{r}
+library(readr)
+library(tidyr)
+```
+
+```{r}
+# 1. 读取 CSV 文件
+df_chem <- read.csv("D:/msc_projecct/QC_urine/QC_urine/KGCO-0504-20DSMLTA+ Urine Data Tables_Chemical Annotation.csv", stringsAsFactors = FALSE)
+df_metabolites <- read.csv("D:/msc_projecct/QC_urine/QC_urine/metabolon_urine_batch_norm_metab_quantile_normalised_at_least_80perc_imputed_2021.csv", stringsAsFactors = FALSE)
+
+```
+
+```{r}
+# 2. 过滤掉 TYPE 列中为 "unnamed" 的行
+df_chem_filtered <- df_chem[df_chem$TYPE != "UNNAMED", ]
+nrow(df_chem)
+nrow(df_chem_filtered)
+```
+```{r}
+# 3. 获取 named 代谢物对应的 COMP_ID
+comp_ids_named <- unique(df_chem_filtered$COMP_ID)
+comp_ids_named <- paste0("M", unique(df_chem_filtered$COMP_ID))
+head(comp_ids_named)
+
+```
+
+```{r}
+# 5. 提取 df_metabolites 中所有以 "M" 开头的代谢物列
+metabolite_columns <- grep("^M[0-9]+$", colnames(df_metabolites), value = TRUE)
+
+head(metabolite_columns)
+length(metabolite_columns)
+
+```
+
+```{r}
+# 6. 筛选代谢物列，只保留 `comp_ids_named` 中存在的列
+filtered_metabolites <- metabolite_columns[metabolite_columns %in% comp_ids_named]
+
+head(filtered_metabolites)
+
+length(filtered_metabolites)
+```
+```{r}
+# 8. 组合：保留元数据列
+all_columns <- colnames(df_metabolites)
+metadata_columns <- setdiff(all_columns, metabolite_columns)  # 非代谢物列
+head(metadata_columns)
+length(metadata_columns)
+```
+```{r}
+# 8. 组合：保留元数据列（前7列） + 筛选出的代谢物列
+final_columns <- c(metadata_columns, filtered_metabolites)
+head(final_columns)
+length(final_columns)
+```
+
+```{r}
+# 筛选数据
+df_filtered <- df_metabolites %>%
+  select(all_of(final_columns))
+
+head(df_filtered)
+```
+```{r}
+# 9. 保存筛选后的数据
+write.csv(df_filtered, "D:/msc_projecct/QC_urine/QC_urine/filtered_named_metabolites.csv", row.names = FALSE)
+```
+
